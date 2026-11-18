@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Tracker</title>
+<style>
+  :root { --bg:#f7f7f8; --card:#fff; --text:#1c1c1e; --muted:#6b6b70; --line:#e2e2e6; --accent:#2f5bea; --ok:#1f8a4c; --mid:#b7791f; --low:#b4363a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141416; --card:#1e1e21; --text:#ececef; --muted:#9a9aa1; --line:#333338; --accent:#7b9bff; --ok:#4cc27e; --mid:#e0a84a; --low:#ef6b6f; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:1100px; margin:auto; padding:16px; }
+  h1 { font-size:1.4rem; margin:.2rem 0 1rem; }
+  h2 { font-size:1rem; margin:0 0 .6rem; }
+  section, details { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  summary { cursor:pointer; font-weight:600; }
+  .grid { display:grid; gap:10px; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); }
+  label { display:flex; flex-direction:column; gap:4px; font-size:.85rem; color:var(--muted); }
+  input, select, textarea, button { font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:7px 9px; }
+  textarea { min-height:70px; }
+  button { cursor:pointer; background:var(--accent); color:#fff; border:0; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
+  .stats { display:flex; flex-wrap:wrap; gap:10px; }
+  .stat { flex:1 1 110px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .stat b { display:block; font-size:1.4rem; }
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:720px; }
+  th, td { text-align:left; padding:8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:.8rem; color:var(--muted); }
+  .pill { font-size:.8rem; font-weight:600; }
+  .Encaja { color:var(--ok); } .Buena { color:var(--mid); } .Poco { color:var(--low); }
+  .row-actions { display:flex; gap:6px; }
+  .muted { color:var(--muted); font-size:.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Job Tracker</h1>
+
+  <div class="stats" id="stats"></div>
+
+  <details id="profileBox">
+    <summary>Mi perfil</summary>
+    <form id="profileForm" class="grid" style="margin-top:10px">
+      <label>Skills / palabras clave (separadas por coma)<textarea name="skills"></textarea></label>
+      <label>Modalidades que aceptas
+        <select name="modalities" multiple size="3"><option>Remoto</option><option>Híbrido</option><option>Presencial</option></select>
+      </label>
+      <label>Salario mínimo (€ brutos/año)<input name="minSalary" type="number" min="0"></label>
+      <div style="align-self:end"><button>Guardar perfil</button></div>
+    </form>
+  </details>
+
+  <details id="offerBox" open>
+    <summary id="offerSummary">Añadir oferta</summary>
+    <form id="offerForm" class="grid" style="margin-top:10px">
+      <input type="hidden" name="id">
+      <label>Puesto<input name="title" required></label>
+      <label>Empresa<input name="company" required></label>
+      <label>Plataforma<select name="platform"><option>LinkedIn</option><option>InfoJobs</option><option>Indeed</option><option>Web empresa</option><option>Referido</option><option>Otra</option></select></label>
+      <label>URL<input name="url" type="url"></label>
+      <label>Ubicación<input name="location"></label>
+      <label>Modalidad<select name="modality"><option>Remoto</option><option>Híbrido</option><option>Presencial</option></select></label>
+      <label>Salario (€ brutos/año)<input name="salary" type="number" min="0"></label>
+      <label>Estado<select name="status"></select></label>
+      <label style="grid-column:1/-1">Descripción (pégala para calcular el encaje)<textarea name="description"></textarea></label>
+      <label style="grid-column:1/-1">Notas / próximos pasos<textarea name="notes"></textarea></label>
+      <div class="row-actions"><button>Guardar oferta</button><button type="button" class="ghost" id="cancelEdit">Limpiar</button></div>
+    </form>
+  </details>
+
+  <section>
+    <h2>Ofertas</h2>
+    <div class="filters">
+      <input id="q" placeholder="Buscar empresa o puesto">
+      <select id="fStatus"><option value="">Todos los estados</option></select>
+      <select id="fFit"><option value="">Todo encaje</option><option>Encaja</option><option>Buena opción</option><option>Poco encaje</option></select>
+      <button class="ghost" id="export">Exportar JSON</button>
+      <label class="ghost" style="flex-direction:row;align-items:center;cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:7px 9px;color:var(--text)">Importar JSON<input type="file" id="import" accept="application/json" hidden></label>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Encaje</th><th>Puesto / Empresa</th><th>Plataforma</th><th>Modalidad</th><th>Estado</th><th>Actualizado</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <p class="muted">Los datos se guardan en este navegador. Exporta JSON de vez en cuando como copia de seguridad.</p>
+  </section>
+</main>
+
+<script src="score.js"></script>
+<script>
+const STATUSES = ['Guardada', 'Aplicada', 'Entrevista', 'Prueba técnica', 'Oferta', 'Rechazada', 'Descartada'];
+const KEY = 'jobtracker:v1';
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+let db = Object.assign({ profile: { skills: [], modalities: [], minSalary: 0 }, offers: [] }, load());
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { alert('No se pudo guardar: ' + e.message); } };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+for (const sel of ['#offerForm [name=status]', '#fStatus'])
+  $(sel).insertAdjacentHTML('beforeend', STATUSES.map(s => `<option>${s}</option>`).join(''));
+
+function fillProfile() {
+  const f = $('#profileForm');
+  f.skills.value = db.profile.skills.join(', ');
+  f.minSalary.value = db.profile.minSalary || '';
+  [...f.modalities.options].forEach(o => o.selected = db.profile.modalities.includes(o.value));
+}
+
+$('#profileForm').onsubmit = e => {
+  e.preventDefault();
+  const f = e.target;
+  db.profile = { skills: f.skills.value.split(',').map(s => s.trim()).filter(Boolean),
+                 modalities: [...f.modalities.selectedOptions].map(o => o.value),
+                 minSalary: Number(f.minSalary.value) || 0 };
+  save(); render();
+};
+
+$('#offerForm').onsubmit = e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  data.updated = new Date().toISOString().slice(0, 10);
+  if (data.id) db.offers = db.offers.map(o => o.id === data.id ? data : o);
+  else db.offers.push({ ...data, id: crypto.randomUUID() });
+  save(); resetForm(); render();
+};
+
+function resetForm() { $('#offerForm').reset(); $('#offerForm').id.value = ''; $('#offerSummary').textContent = 'Añadir oferta'; }
+$('#cancelEdit').onclick = resetForm;
+
+function edit(id) {
+  const o = db.offers.find(x => x.id === id), f = $('#offerForm');
+  for (const [k, v] of Object.entries(o)) if (f[k]) f[k].value = v;
+  $('#offerSummary').textContent = 'Editar oferta';
+  $('#offerBox').open = true; f.scrollIntoView({ behavior: 'smooth' });
+}
+function del(id) { if (confirm('¿Borrar esta oferta?')) { db.offers = db.offers.filter(o => o.id !== id); save(); render(); } }
+function setStatus(id, status) {
+  const o = db.offers.find(x => x.id === id);
+  o.status = status; o.updated = new Date().toISOString().slice(0, 10); save(); render();
+}
+
+function render() {
+  const scored = db.offers.map(o => ({ ...o, ...scoreOffer(o, db.profile) }));
+  const active = scored.filter(o => !['Rechazada', 'Descartada'].includes(o.status));
+  const count = s => scored.filter(o => o.status === s).length;
+  $('#stats').innerHTML = [
+    ['Total', scored.length], ['Activas', active.length],
+    ['Encajan', active.filter(o => o.fit === 'Encaja').length],
+    ['Aplicadas', count('Aplicada')], ['Entrevistas', count('Entrevista') + count('Prueba técnica')], ['Ofertas', count('Oferta')]
+  ].map(([k, v]) => `<div class="stat"><span class="muted">${k}</span><b>${v}</b></div>`).join('');
+
+  const q = $('#q').value.toLowerCase(), fs = $('#fStatus').value, ff = $('#fFit').value;
+  const list = scored
+    .filter(o => (!q || `${o.title} ${o.company}`.toLowerCase().includes(q)) && (!fs || o.status === fs) && (!ff || o.fit === ff))
+    .sort((a, b) => b.score - a.score);
+
+  $('#rows').innerHTML = list.map(o => `<tr>
+    <td><span class="pill ${o.fit.split(' ')[0]}">${o.score}% · ${o.fit}</span><div class="muted">${esc(o.matched.join(', '))}</div></td>
+    <td>${o.url ? `<a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a>` : esc(o.title)}<div class="muted">${esc(o.company)} · ${esc(o.location)}</div>${o.notes ? `<div class="muted">📝 ${esc(o.notes)}</div>` : ''}</td>
+    <td>${esc(o.platform)}</td>
+    <td>${esc(o.modality)}${o.salary ? `<div class="muted">${Number(o.salary).toLocaleString('es-ES')} €</div>` : ''}</td>
+    <td><select aria-label="Estado" data-status="${o.id}">${STATUSES.map(s => `<option ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+    <td class="muted">${esc(o.updated)}</td>
+    <td class="row-actions"><button class="ghost" data-edit="${o.id}">Editar</button><button class="ghost" data-del="${o.id}" aria-label="Borrar">✕</button></td>
+  </tr>`).join('') || '<tr><td colspan="7" class="muted">Sin ofertas todavía.</td></tr>';
+}
+
+$('#rows').onclick = e => { const t = e.target.dataset; if (t.edit) edit(t.edit); if (t.del) del(t.del); };
+$('#rows').onchange = e => { if (e.target.dataset.status) setStatus(e.target.dataset.status, e.target.value); };
+['#q', '#fStatus', '#fFit'].forEach(s => $(s).oninput = render);
+
+$('#export').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
+  a.download = `job-tracker-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+};
+$('#import').onchange = async e => {
+  try {
+    const data = JSON.parse(await e.target.files[0].text());
+    if (!Array.isArray(data.offers) || !data.profile) throw new Error('formato no válido');
+    if (confirm(`Sustituir los datos actuales por ${data.offers.length} ofertas?`)) { db = data; save(); fillProfile(); render(); }
+  } catch (err) { alert('No se pudo importar: ' + err.message); }
+  e.target.value = '';
+};
+
+fillProfile(); render();
+</script>
+</body>
+</html>
